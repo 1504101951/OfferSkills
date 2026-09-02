@@ -5,7 +5,7 @@
 
 | 执行 Issue | 阻塞于 | 状态 | Executor 会话 | Reviewer 会话 | 返工次数 | 验收证据摘要 |
 | --- | --- | --- | --- | --- | --- | --- |
-| https://github.com/1504101951/OfferSkills/issues/2 | 无 | pending | 待派发 | 待创建 | 0 | |
+| https://github.com/1504101951/OfferSkills/issues/2 | 无 | accepted | grok session `dfdd48f1-648c-4943-9485-74e2b583b087` | claude session `e99c251c-2e61-4ec1-b3cb-8307529cdbef` | 0 | `unittest`: 7/7；Review 核验外键、唯一约束、持久化重连、多次评分均通过 |
 | https://github.com/1504101951/OfferSkills/issues/3 | #2 | pending | 待派发 | 待创建 | 0 | |
 | https://github.com/1504101951/OfferSkills/issues/4 | #2 | pending | 待派发 | 待创建 | 0 | |
 | https://github.com/1504101951/OfferSkills/issues/5 | #2、#4 | pending | 待派发 | 待创建 | 0 | |
