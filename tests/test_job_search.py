@@ -290,6 +290,44 @@ class JobSearchRoleTest(unittest.TestCase):
         }
         self.assertEqual(names, {"Python", "SQL"})
 
+    def test_invalid_duplicate_job_id_writes_nothing(self) -> None:
+        """已存在或本批重复的 job_id 仍须校验当前输入，无效则整批不写入。
+
+        边界：先保存 saved，再同批传入合法 new 与 saved 的非列表 requirements；
+        另：同批首次合法、后续同 ID 缺 source_url。
+        """
+        self.role.search([self._backend_job(job_id="saved")])
+        with self.assertRaises(ValueError):
+            self.role.search(
+                [
+                    self._backend_job(
+                        job_id="new",
+                        source_url="https://example.com/jobs/new",
+                    ),
+                    {"job_id": "saved", "requirements": "not-a-list"},
+                ]
+            )
+        self.assertIsNone(self.store.get_job("new"))
+        self.assertEqual(self.store.get_job("saved")["title"], "Backend Engineer")
+        self.assertEqual(
+            {row["name"] for row in self.role.get("saved")["requirements"]},
+            {"Python", "SQL"},
+        )
+
+        with self.assertRaises(ValueError):
+            self.role.search(
+                [
+                    self._backend_job(job_id="batch-first"),
+                    {
+                        "job_id": "batch-first",
+                        "source": "web",
+                        "title": "Other",
+                        "requirements": [{"name": "Redis", "evidence": "熟悉 Redis"}],
+                    },
+                ]
+            )
+        self.assertIsNone(self.store.get_job("batch-first"))
+
 
 if __name__ == "__main__":
     unittest.main()

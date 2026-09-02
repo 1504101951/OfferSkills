@@ -60,7 +60,8 @@ class JobSearchRole:
             jobs: 公开岗位列表。每项含 source、source_url、title，以及
                 requirements 列表；可选 job_id、city、salary、description。
                 每条要求至少含非空 name 与原文 evidence。
-                库中已有或本批已出现的 job_id 直接复用，不校验其余字段。
+                库中已有或本批已出现的 job_id 仍须完整校验当前输入；
+                通过后才复用快照，不覆盖字段、不追加要求。
         返回:
             {jobs: list[dict]}。每项含 job_id、source、source_url、title、city、
             salary、description、reused，以及 requirements。
@@ -81,12 +82,6 @@ class JobSearchRole:
             if not job_id_ok:
                 invalid = True
                 continue
-            if job_id:
-                # 库中快照和本批首次条目都不可变；后出现的同 ID 不能再走 save_job
-                if job_id in seen_ids or self._store.get_job(job_id):
-                    pending.append({"reused": True, "job_id": job_id})
-                    seen_ids.add(job_id)
-                    continue
 
             source = _text(listing.get("source"))
             source_url = _text(listing.get("source_url"))
@@ -121,8 +116,13 @@ class JobSearchRole:
             ):
                 invalid = True
                 continue
+            # 先校验再谈复用：无效重复项若提前 continue，同批新岗位会被放行
+            reused = bool(job_id and (job_id in seen_ids or self._store.get_job(job_id)))
             if job_id:
                 seen_ids.add(job_id)
+            if reused:
+                pending.append({"reused": True, "job_id": job_id})
+                continue
             pending.append(
                 {
                     "reused": False,
