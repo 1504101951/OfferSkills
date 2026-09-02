@@ -1,11 +1,53 @@
 ---
 name: job-seeker
-description: 按岗位要求搜索并保存带来源的公开学习资料，基于已有知识切片生成题目并评估用户答案，支持跨会话按 requirement_id 与 question_id 复用。
+description: 保存公开岗位与原子岗位要求，按岗位要求搜索并保存带来源的公开学习资料，基于已有知识切片生成题目并评估用户答案，支持跨会话按稳定 ID 复用。
 ---
 
 # 求职Agent Skill
 
 本地单用户 Skill。角色通过稳定 ID 读写共享 SQLite（`memory.MemoryStore`），不隐式触发其他角色。
+
+## 岗位搜索角色
+
+通用 Agent 全网搜索并理解公开岗位后输出结构化岗位与原子要求；岗位搜索角色只校验并保存，不解析岗位描述，也不用正则或分隔符推断要求。
+
+每条岗位至少含 `source`、`source_url`、`title`，以及 `requirements` 列表。`job_id`、`city`、`salary` 可空。每条原子要求至少含非空 `name` 与原文 `evidence`。先校验整批岗位与要求，再写入；任一无效则整批不写入。同一 `normalized_name` 只保留一条 `requirements` 记录，各岗位分别保存 `job_requirements` 与 evidence。
+
+### 调用
+
+```python
+from memory import MemoryStore
+from job_search import JobSearchRole
+
+store = MemoryStore("jobseeker.db")
+role = JobSearchRole(store)
+result = role.search(
+    [
+        {
+            "job_id": "job-backend",
+            "source": "web",
+            "source_url": "https://example.com/jobs/backend",
+            "title": "Backend Engineer",
+            "city": "Shanghai",
+            "salary": "30k-40k",
+            "requirements": [
+                {"name": "Python", "evidence": "熟悉 Python"},
+                {"name": "SQL", "evidence": "3 年 SQL 经验"},
+            ],
+        }
+    ]
+)
+```
+
+成功时使用 `result["jobs"]`。已保存的 `job_id` 再次传入时，该项 `reused` 为 true，直接使用已保存岗位与要求，不覆盖字段、不追加要求。
+
+保存后按稳定 ID 回找岗位及其要求：
+
+```python
+job = role.get(job_id)
+```
+
+岗位不存在时返回 `{"missing": "job_id", "job_id": ...}`，停止，不要去搜知识或出题。
 
 ## 知识搜索角色
 
