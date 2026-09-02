@@ -17,16 +17,36 @@ SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "memory_tool.py"
 
 class MemoryToolTest(unittest.TestCase):
     def setUp(self) -> None:
+        """为每个用例准备独立 HOME，避免写入开发者真实 ~/.offerskills。
+
+        参数:
+            无。
+        返回:
+            None。副作用是创建临时目录并设置 self.home / self.db_path / self.env。
+        """
         self.tmp = tempfile.TemporaryDirectory()
         self.home = Path(self.tmp.name)
         self.db_path = self.home / ".offerskills" / "jobseeker.db"
         self.env = {**os.environ, "HOME": str(self.home)}
 
     def tearDown(self) -> None:
+        """删掉本用例的临时 HOME，避免残留库文件干扰后续用例。
+
+        参数:
+            无。
+        返回:
+            None。
+        """
         self.tmp.cleanup()
 
     def _run(self, payload: dict[str, Any] | str) -> subprocess.CompletedProcess[str]:
-        """在隔离 HOME 下启动脚本进程。cwd 不是仓库根，用于证明脚本自己能 import。"""
+        """在隔离 HOME 下启动脚本进程。cwd 不是仓库根，用于证明脚本自己能 import。
+
+        参数:
+            payload: 请求 object，或直接作为 stdin 的原始字符串。
+        返回:
+            subprocess.CompletedProcess，含 returncode、stdout、stderr。
+        """
         raw = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
         return subprocess.run(
             [sys.executable, str(SCRIPT)],
@@ -194,6 +214,20 @@ class MemoryToolTest(unittest.TestCase):
                 self.assertEqual(payload["db_path"], str(self.db_path))
                 self.assertEqual(stderr, "")
                 self.assertFalse(self.db_path.exists())
+
+    def test_deeply_nested_json_is_invalid_json(self) -> None:
+        """过深嵌套必须按 invalid_json 失败，不能把 RecursionError traceback 漏到 stderr。
+
+        边界：约 1200 层数组；stdout 可 json.loads 为单个 object；stderr 空；非零退出。
+        """
+        nested = "[" * 1200 + "]" * 1200
+        code, payload, stderr = self._call(nested)
+        self.assertNotEqual(code, 0)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"], "invalid_json")
+        self.assertEqual(payload["db_path"], str(self.db_path))
+        self.assertEqual(stderr, "")
+        self.assertFalse(self.db_path.exists())
 
     def test_missing_stable_ids_do_not_write(self) -> None:
         """查询不存在的稳定 ID 必须返回 missing 结构，退出码 0，业务表无行。

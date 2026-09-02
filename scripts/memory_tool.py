@@ -139,7 +139,8 @@ def main() -> int:
     path_text = str(path)
     try:
         request = json.loads(sys.stdin.read())
-    except json.JSONDecodeError as exc:
+    # 过深嵌套会 RecursionError 而不是 JSONDecodeError；不捕就会把 traceback 漏到 stderr
+    except (json.JSONDecodeError, RecursionError) as exc:
         write_json(
             {
                 "ok": False,
