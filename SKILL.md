@@ -1,6 +1,6 @@
 ---
 name: job-seeker
-description: 按岗位要求搜索并保存带来源的公开学习资料，并基于已有知识切片生成题目、标准答案和解析，支持跨会话按 requirement_id 与 question_id 复用。
+description: 按岗位要求搜索并保存带来源的公开学习资料，基于已有知识切片生成题目并评估用户答案，支持跨会话按 requirement_id 与 question_id 复用。
 ---
 
 # 求职Agent Skill
@@ -110,3 +110,43 @@ question = role.get(question_id)
 ```
 
 题目不存在时返回 `{"missing": "question_id", "question_id": ...}`。
+
+## 打分角色
+
+通用 Agent 按 `question_id` 读取题目与标准答案后生成结构化评分结果；打分角色只校验并保存，不对照标准答案改分，也不隐式出题。
+
+评分结果至少含 `user_answer`、`score`、`max_score`。须满足 `0 <= score <= max_score` 且 `max_score > 0`。`loss_reason` 与 `weak_points` 为可空文本，不要传列表。同一题可多次作答，每次追加一条记录。
+
+### 调用
+
+```python
+from memory import MemoryStore
+from scoring import ScoringRole
+
+store = MemoryStore("jobseeker.db")
+role = ScoringRole(store)
+```
+
+`question_id` 不在记忆中时，返回 `{"missing": "question_id", "question_id": ...}`，停止，不要去出题：
+
+```python
+result = role.score("q-missing", {"user_answer": "不知道", "score": 0, "max_score": 10})
+```
+
+题目在时，Agent 先读题再评分：
+
+```python
+question = role.get(question_id)
+result = role.score(
+    question_id,
+    {
+        "user_answer": "返回笛卡尔积。",
+        "score": 2,
+        "max_score": 10,
+        "loss_reason": "把 JOIN 理解成了叉乘。",
+        "weak_points": "JOIN 与笛卡尔积的区别",
+    },
+)
+```
+
+成功时使用返回记录的 `score_id`、`user_answer`、`score`、`max_score`、`loss_reason`、`weak_points`。新会话再 `get` 同一 `question_id`，`question["scores"]` 即作答历史，每项含薄弱点。

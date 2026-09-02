@@ -9,7 +9,7 @@
 | https://github.com/1504101951/OfferSkills/issues/3 | #2 | blocked | grok session `2b372421-ce21-4bf6-a324-c20e3483221c`；返工 `5f84183b-5537-47df-ac9d-ccd0b038f5d8`、`c22379e0-68c5-4baa-ac15-893bf7537de0` | claude session `8a5fd272-f70f-413c-a572-76108407945b` | 2 | 29/29；小数经验与同行标题提取仍未通过最终 Review |
 | https://github.com/1504101951/OfferSkills/issues/4 | #2 | accepted | grok session `9b251736-aacb-447a-90ab-810724341fc6`；返工 `4fbb8a12-faad-4842-b06e-dd4b90c39494` | claude session `816af4ff-1e2d-457b-a70d-f0d6749ca4eb` | 1 | `unittest`: 20/20；批量校验原子性回归通过 |
 | https://github.com/1504101951/OfferSkills/issues/5 | #2、#4 | accepted | grok session `eb5c9f99-59d9-4827-910f-0cba2d225d72`；返工 `52707613-a74b-4c8f-95df-e179ddb9fb26` | claude session `9a5ecbe2-a695-447c-abac-1e688171cd97` | 1 | `unittest`: 32/32；Agent 草稿与解析独立，跨会话回找通过 |
-| https://github.com/1504101951/OfferSkills/issues/6 | #2、#5 | pending | 待派发 | 待创建 | 0 | |
+| https://github.com/1504101951/OfferSkills/issues/6 | #2、#5 | accepted | grok session `69c7455b-1eb7-447a-b5ca-5c9e8ebddab4`；返工 `6a15a275-8764-4214-8a43-40135e080aa3` | claude session `faae62b3-8b0b-432f-bc34-c88430536c18` | 1 | `unittest`: 42/42；有限分数边界、多次评分、跨会话查询通过 |
 
 ## 验收边界
 
