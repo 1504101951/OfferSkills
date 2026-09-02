@@ -42,8 +42,9 @@ class KnowledgeSearchRole:
 
         参数:
             requirement_id: 岗位要求稳定 ID。
-            chunks: Agent 已切好的切片列表。每项含 title、content、source_url、
-                evidence。已有切片时可省略。
+            chunks: Agent 已切好的切片列表。每项含非空 requirement_id、title、
+                content、source_url、evidence；requirement_id 须与外层参数一致。
+                已有切片时可省略。
         返回:
             缺失要求: {missing: "requirement_id", requirement_id: str}
             命中或写入: {requirement_id: str, reused: bool, chunks: list[dict]}
@@ -77,19 +78,24 @@ class KnowledgeSearchRole:
             if not isinstance(chunk, dict):
                 invalid = True
                 continue
-            given_req = chunk.get("requirement_id")
-            # 切片自带 requirement_id 时必须指向本次要求，避免写入其它要求的资料
-            req_ok = given_req is None or _text(given_req) == requirement_id
+            # 缺字段不能用外层参数补：否则 Agent 未声明归属的切片也会入库
+            chunk_req = _text(chunk.get("requirement_id"))
             title = _text(chunk.get("title"))
             content = _text(chunk.get("content"))
             source_url = _text(chunk.get("source_url"))
             evidence = _text(chunk.get("evidence"))
-            if not (req_ok and title and content and source_url and evidence):
+            if not (
+                chunk_req == requirement_id
+                and title
+                and content
+                and source_url
+                and evidence
+            ):
                 invalid = True
                 continue
             pending.append(
                 {
-                    "requirement_id": requirement_id,
+                    "requirement_id": chunk_req,
                     "title": title,
                     "content": content,
                     "source_url": source_url,

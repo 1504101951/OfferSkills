@@ -53,7 +53,7 @@ job = role.get(job_id)
 
 通用 Agent 阅读公开资料并输出语义完整的结构化知识切片；知识搜索角色只校验并保存，不搜索网页、不总结、不按空行或字数切分。
 
-每条切片至少含非空 `title`、`content`、`source_url`、`evidence`。先校验整批切片，再在一个事务中写入；任一无效则整批不写入。已有切片时直接复用，不重新搜索。
+每条切片至少含非空 `requirement_id`、`title`、`content`、`source_url`、`evidence`；`requirement_id` 须与 `search` 外层参数一致。先校验整批切片，再在一个事务中写入；任一无效则整批不写入。已有切片时直接复用，不重新搜索。
 
 ### 调用
 
@@ -77,6 +77,7 @@ result = role.search(
     requirement_id,
     chunks=[
         {
+            "requirement_id": requirement_id,
             "title": "INNER JOIN",
             "content": "INNER JOIN 只返回两表键匹配的行。",
             "source_url": "https://example.com/sql-join",
@@ -86,7 +87,7 @@ result = role.search(
 )
 ```
 
-成功时使用 `result["chunks"]`。`content` 保持 Agent 给出的语义边界；缺少 `source_url` 或 `evidence` 会失败。不要接入搜索聚合层或向量数据库。
+成功时使用 `result["chunks"]`。`content` 保持 Agent 给出的语义边界；缺少 `requirement_id`、`source_url` 或 `evidence` 会失败。不要接入搜索聚合层或向量数据库。
 
 ## 出题角色
 

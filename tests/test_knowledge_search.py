@@ -40,6 +40,7 @@ class KnowledgeSearchRoleTest(unittest.TestCase):
             req["requirement_id"],
             chunks=[
                 self._chunk(
+                    requirement_id="req-py",
                     title="列表与生成器",
                     content="列表推导比循环更短。\n\n生成器按需产出值。",
                     source_url="https://docs.python.org/3/tutorial/datastructures.html",
@@ -77,12 +78,13 @@ class KnowledgeSearchRoleTest(unittest.TestCase):
         req = self.store.save_requirement(name="SQL")
         first = self.role.search(
             req["requirement_id"],
-            chunks=[self._chunk()],
+            chunks=[self._chunk(requirement_id=req["requirement_id"])],
         )
         second = self.role.search(
             req["requirement_id"],
             chunks=[
                 self._chunk(
+                    requirement_id=req["requirement_id"],
                     title="其他",
                     content="不该被写入。",
                     source_url="https://example.com/other",
@@ -112,6 +114,7 @@ class KnowledgeSearchRoleTest(unittest.TestCase):
                 "req-http",
                 chunks=[
                     self._chunk(
+                        requirement_id="req-http",
                         title="GET",
                         content="GET 用于获取资源。",
                         source_url="https://example.com/http-get",
@@ -152,28 +155,48 @@ class KnowledgeSearchRoleTest(unittest.TestCase):
     def test_invalid_chunk_writes_nothing(self) -> None:
         """任一切片缺必填非空字符串时整批不写入，避免半成品被下次 search 复用。
 
-        边界：source_url 空串；后一条缺 evidence；title 非字符串；requirement_id 不一致。
+        边界：source_url 空串；后一条缺 evidence；title 非字符串；
+        requirement_id 缺失、空白、非字符串或不匹配。
         """
         req = self.store.save_requirement(name="Linux")
         req_id = req["requirement_id"]
-        valid = self._chunk()
+        valid = self._chunk(requirement_id=req_id)
 
         with self.assertRaises(ValueError):
             self.role.search(
                 req_id,
-                chunks=[self._chunk(title="man", content="ls 列出目录。", source_url="")],
+                chunks=[
+                    self._chunk(
+                        requirement_id=req_id,
+                        title="man",
+                        content="ls 列出目录。",
+                        source_url="",
+                    )
+                ],
             )
         self.assertEqual(self.store.list_knowledge_chunks(req_id), [])
 
         with self.assertRaises(ValueError):
             self.role.search(
                 req_id,
-                chunks=[valid, self._chunk(title="rebase", evidence="")],
+                chunks=[valid, self._chunk(requirement_id=req_id, title="rebase", evidence="")],
             )
         self.assertEqual(self.store.list_knowledge_chunks(req_id), [])
 
         with self.assertRaises(ValueError):
-            self.role.search(req_id, chunks=[self._chunk(title=1)])
+            self.role.search(req_id, chunks=[self._chunk(requirement_id=req_id, title=1)])
+        self.assertEqual(self.store.list_knowledge_chunks(req_id), [])
+
+        with self.assertRaises(ValueError):
+            self.role.search(req_id, chunks=[self._chunk()])
+        self.assertEqual(self.store.list_knowledge_chunks(req_id), [])
+
+        with self.assertRaises(ValueError):
+            self.role.search(req_id, chunks=[self._chunk(requirement_id="")])
+        self.assertEqual(self.store.list_knowledge_chunks(req_id), [])
+
+        with self.assertRaises(ValueError):
+            self.role.search(req_id, chunks=[self._chunk(requirement_id=1)])
         self.assertEqual(self.store.list_knowledge_chunks(req_id), [])
 
         with self.assertRaises(ValueError):
