@@ -5,7 +5,114 @@ description: 保存公开岗位与原子岗位要求，按岗位要求搜索并�
 
 # 求职Agent Skill
 
-本地单用户 Skill。角色通过稳定 ID 读写共享 SQLite（`memory.MemoryStore`），不隐式触发其他角色。
+本地单用户 Skill。角色通过稳定 ID 读写共享 SQLite（`memory.MemoryStore`），不隐式触发其他角色。Agent 不要临时写 Python，直接调用 `scripts/memory_tool.py`。
+
+## JSON 工具
+
+每次启动脚本从 stdin 读**一个** JSON object，只向 stdout 写**一个** JSON object。不要传子命令、不要设环境变量覆盖库路径。
+
+```bash
+python3 scripts/memory_tool.py
+```
+
+默认数据库是 `~/.offerskills/jobseeker.db`。脚本会创建父目录；响应里的 `db_path` 是展开后的实际路径。请求里的 `db_path` 会被忽略。
+
+### 成功
+
+退出码 0。`result` 为对应角色或查询的返回值；查询不到稳定 ID 时 `result` 为角色风格的 missing 结构，不会写库。
+
+```json
+{"ok": true, "action": "get_job", "db_path": "/home/user/.offerskills/jobseeker.db", "result": {"missing": "job_id", "job_id": "job-x"}}
+```
+
+### 失败
+
+退出码非 0。`error` 可机器判断：`invalid_json`、`unknown_action`、`invalid_request`、`invalid_input`、`internal`。stdout 仍是 JSON，不会混入日志或 traceback。
+
+```json
+{"ok": false, "error": "unknown_action", "message": "未知动作: 'nope'", "db_path": "/home/user/.offerskills/jobseeker.db"}
+```
+
+### 动作
+
+| action | 字段 | 行为 |
+| --- | --- | --- |
+| `save_jobs` | `jobs`：岗位列表 | `JobSearchRole.search` |
+| `get_job` | `job_id` | `JobSearchRole.get` |
+| `search_knowledge` | `requirement_id`；`chunks` 可省略 | `KnowledgeSearchRole.search`；省略 `chunks` 时复用已有切片 |
+| `get_chunk` | `chunk_id` | 按稳定 ID 读切片；不存在时 `{"missing": "chunk_id", "chunk_id": ...}` |
+| `save_questions` | `drafts`；`requirement_id` 可省略 | `QuestionRole.generate` |
+| `get_question` | `question_id` | `QuestionRole.get` |
+| `save_score` | `question_id`、`result` | `ScoringRole.score` |
+| `get_score` | `score_id` | 按稳定 ID 读评分；不存在时 `{"missing": "score_id", "score_id": ...}` |
+
+未知 `action` 或非法 JSON 立即失败，不写库。
+
+### 示例
+
+保存岗位：
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "save_jobs", "jobs": [{"job_id": "job-backend", "source": "web", "source_url": "https://example.com/jobs/backend", "title": "Backend Engineer", "city": "Shanghai", "salary": "30k-40k", "requirements": [{"name": "Python", "evidence": "熟悉 Python"}, {"name": "SQL", "evidence": "3 年 SQL 经验"}]}]}
+EOF
+```
+
+按 `job_id` 回找：
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "get_job", "job_id": "job-backend"}
+EOF
+```
+
+按 `requirement_id` 保存或复用知识，再按 `chunk_id` 读切片：
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "search_knowledge", "requirement_id": "requirement-id", "chunks": [{"requirement_id": "requirement-id", "title": "INNER JOIN", "content": "INNER JOIN 只返回两表键匹配的行。", "source_url": "https://example.com/sql-join", "evidence": "INNER JOIN produces a result set that includes only matching rows."}]}
+EOF
+```
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "search_knowledge", "requirement_id": "requirement-id"}
+EOF
+```
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "get_chunk", "chunk_id": "chunk-id"}
+EOF
+```
+
+保存并按 `question_id` 回找题目：
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "save_questions", "requirement_id": "requirement-id", "drafts": [{"chunk_id": "chunk-id", "prompt": "INNER JOIN 返回哪些行？", "standard_answer": "只返回两表键匹配的行。", "explanation": "无匹配行会被丢弃，与 LEFT JOIN 保留左表全部行不同。"}]}
+EOF
+```
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "get_question", "question_id": "q-chunk-id"}
+EOF
+```
+
+保存并按 `score_id` 回找评分：
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "save_score", "question_id": "q-chunk-id", "result": {"user_answer": "返回笛卡尔积。", "score": 2, "max_score": 10, "loss_reason": "把 JOIN 理解成了叉乘。", "weak_points": "JOIN 与笛卡尔积的区别"}}
+EOF
+```
+
+```bash
+python3 scripts/memory_tool.py <<'EOF'
+{"action": "get_score", "score_id": "score-id"}
+EOF
+```
 
 ## 岗位搜索角色
 
