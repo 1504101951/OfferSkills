@@ -50,6 +50,8 @@ python3 scripts/memory_tool.py
 
 ### 示例
 
+以下示例中的 `requirement-id`、`chunk-id`、`q-chunk-id`、`score-id` 是占位符。串联调用时必须从前一步响应复制真实 ID，不要原样提交占位符。
+
 保存岗位：
 
 ```bash
