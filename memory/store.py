@@ -33,12 +33,14 @@ CREATE TABLE IF NOT EXISTS job_requirements (
     FOREIGN KEY (requirement_id) REFERENCES requirements(requirement_id)
 );
 
+-- title/evidence 必填：出题角色把切片当完整资料，缺标题或出处原文无法追溯
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
     chunk_id TEXT PRIMARY KEY,
     requirement_id TEXT NOT NULL,
     source_url TEXT NOT NULL,
-    title TEXT,
+    title TEXT NOT NULL,
     content TEXT NOT NULL,
+    evidence TEXT NOT NULL,
     FOREIGN KEY (requirement_id) REFERENCES requirements(requirement_id)
 );
 
@@ -296,37 +298,75 @@ class MemoryStore:
         *,
         requirement_id: str,
         source_url: str,
+        title: str,
         content: str,
+        evidence: str,
         chunk_id: str | None = None,
-        title: str | None = None,
     ) -> dict[str, Any]:
-        """按 chunk_id 写入学习资料切片，source_url 必填以便追溯来源。
+        """按 chunk_id 写入一条学习资料切片。走整批事务入口，避免单条路径漏 evidence。
 
         参数:
             requirement_id: 所属岗位要求 ID。
             source_url: 资料来源 URL。
+            title: 切片标题。
             content: 切片正文。
+            evidence: 来源中支持该切片的原文。
             chunk_id: 稳定 ID；缺省则生成。
-            title: 可选标题。
         返回:
-            dict: {chunk_id, requirement_id, source_url, title, content}
+            dict: {chunk_id, requirement_id, source_url, title, content, evidence}
         """
-        chunk_id = chunk_id or _new_id()
-        self._conn.execute(
-            """
-            INSERT INTO knowledge_chunks (chunk_id, requirement_id, source_url, title, content)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(chunk_id) DO UPDATE SET
-                requirement_id=excluded.requirement_id,
-                source_url=excluded.source_url,
-                title=excluded.title,
-                content=excluded.content
-            """,
-            (chunk_id, requirement_id, source_url, title, content),
-        )
-        self._conn.commit()
-        saved = self.get_knowledge_chunk(chunk_id)
-        assert saved is not None
+        item: dict[str, Any] = {
+            "requirement_id": requirement_id,
+            "source_url": source_url,
+            "title": title,
+            "content": content,
+            "evidence": evidence,
+        }
+        if chunk_id is not None:
+            item["chunk_id"] = chunk_id
+        return self.save_knowledge_chunks([item])[0]
+
+    def save_knowledge_chunks(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """在一个事务内写入整批切片。中途约束失败必须回滚，避免半批被复用。
+
+        参数:
+            chunks: 每项含 requirement_id、source_url、title、content、evidence；
+                chunk_id 可选。
+        返回:
+            写入后的切片 dict 列表，顺序与输入一致。
+        """
+        saved_ids: list[str] = []
+        with self._conn:
+            for chunk in chunks:
+                chunk_id = chunk.get("chunk_id") or _new_id()
+                self._conn.execute(
+                    """
+                    INSERT INTO knowledge_chunks (
+                        chunk_id, requirement_id, source_url, title, content, evidence
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(chunk_id) DO UPDATE SET
+                        requirement_id=excluded.requirement_id,
+                        source_url=excluded.source_url,
+                        title=excluded.title,
+                        content=excluded.content,
+                        evidence=excluded.evidence
+                    """,
+                    (
+                        chunk_id,
+                        chunk["requirement_id"],
+                        chunk["source_url"],
+                        chunk["title"],
+                        chunk["content"],
+                        chunk["evidence"],
+                    ),
+                )
+                saved_ids.append(chunk_id)
+        saved = []
+        for cid in saved_ids:
+            row = self.get_knowledge_chunk(cid)
+            assert row is not None
+            saved.append(row)
         return saved
 
     def get_knowledge_chunk(self, chunk_id: str) -> dict[str, Any] | None:
@@ -338,7 +378,7 @@ class MemoryStore:
             切片 dict，不存在时为 None。
         """
         row = self._conn.execute(
-            "SELECT chunk_id, requirement_id, source_url, title, content "
+            "SELECT chunk_id, requirement_id, source_url, title, content, evidence "
             "FROM knowledge_chunks WHERE chunk_id = ?",
             (chunk_id,),
         ).fetchone()
@@ -353,7 +393,7 @@ class MemoryStore:
             list[dict]，顺序为写入顺序。
         """
         rows = self._conn.execute(
-            "SELECT chunk_id, requirement_id, source_url, title, content "
+            "SELECT chunk_id, requirement_id, source_url, title, content, evidence "
             "FROM knowledge_chunks WHERE requirement_id = ? ORDER BY rowid",
             (requirement_id,),
         ).fetchall()

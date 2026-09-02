@@ -27,6 +27,7 @@ class QuestionRoleTest(unittest.TestCase):
             source_url="https://example.com/sql-join",
             title="INNER JOIN",
             content="INNER JOIN 只返回两表匹配行。",
+            evidence="INNER JOIN 只返回两表匹配行。",
         )
         self.store.save_knowledge_chunk(
             chunk_id="chunk-group",
@@ -34,6 +35,7 @@ class QuestionRoleTest(unittest.TestCase):
             source_url="https://example.com/sql-group",
             title="GROUP BY",
             content="GROUP BY 按键聚合行。",
+            evidence="GROUP BY 按键聚合行。",
         )
         return req
 
@@ -227,6 +229,7 @@ class QuestionRoleTest(unittest.TestCase):
                 source_url="https://example.com/listcomp",
                 title="列表推导",
                 content="列表推导比循环更短。",
+                evidence="列表推导比循环更短。",
             )
             saved = QuestionRole(first_store).generate(
                 "req-py",

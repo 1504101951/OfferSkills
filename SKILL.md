@@ -51,7 +51,9 @@ job = role.get(job_id)
 
 ## 知识搜索角色
 
-按 `requirement_id` 收集公开学习资料，切成知识切片后写入记忆。每个切片含 `requirement_id`、标题、正文、`source_url`。已有切片时直接复用，不重新搜索。
+通用 Agent 阅读公开资料并输出语义完整的结构化知识切片；知识搜索角色只校验并保存，不搜索网页、不总结、不按空行或字数切分。
+
+每条切片至少含非空 `title`、`content`、`source_url`、`evidence`。先校验整批切片，再在一个事务中写入；任一无效则整批不写入。已有切片时直接复用，不重新搜索。
 
 ### 调用
 
@@ -68,22 +70,23 @@ result = role.search(requirement_id)
 
 已有切片时，`result["reused"]` 为 true，直接使用 `result["chunks"]`。
 
-尚无切片时：用公开网页搜索该岗位要求名称（`store.get_requirement(requirement_id)["name"]`）对应的教程或文档，抓取正文后再次调用：
+尚无切片时，用岗位要求名称（`store.get_requirement(requirement_id)["name"]`）检索公开教程或文档，理解后切成语义完整的切片，再次调用：
 
 ```python
 result = role.search(
     requirement_id,
-    documents=[
+    chunks=[
         {
-            "title": "文档标题",
-            "content": "段落一。\n\n段落二。",
-            "source_url": "https://example.com/lesson",
+            "title": "INNER JOIN",
+            "content": "INNER JOIN 只返回两表键匹配的行。",
+            "source_url": "https://example.com/sql-join",
+            "evidence": "INNER JOIN produces a result set that includes only matching rows.",
         }
     ],
 )
 ```
 
-空行分段，每段单独成切片，共用该文档的 `title` 与 `source_url`。缺少 `source_url` 会失败。不要接入搜索聚合层或向量数据库。
+成功时使用 `result["chunks"]`。`content` 保持 Agent 给出的语义边界；缺少 `source_url` 或 `evidence` 会失败。不要接入搜索聚合层或向量数据库。
 
 ## 出题角色
 

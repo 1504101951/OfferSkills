@@ -103,6 +103,7 @@ class MemoryStoreTest(unittest.TestCase):
             source_url="https://example.com/sql-join",
             title="JOIN",
             content="INNER JOIN 只返回两表匹配行。",
+            evidence="INNER JOIN 只返回两表匹配行。",
         )
         question = self.store.save_question(
             question_id="q-sql-1",
@@ -127,6 +128,10 @@ class MemoryStoreTest(unittest.TestCase):
         self.assertEqual(
             self.store.list_knowledge_chunks("req-sql")[0]["source_url"],
             "https://example.com/sql-join",
+        )
+        self.assertEqual(
+            self.store.list_knowledge_chunks("req-sql")[0]["evidence"],
+            "INNER JOIN 只返回两表匹配行。",
         )
         self.assertEqual(self.store.list_questions("req-sql")[0]["question_id"], "q-sql-1")
 
