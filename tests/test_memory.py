@@ -27,7 +27,7 @@ class MemoryStoreTest(unittest.TestCase):
         self.store.close()
 
     def test_initialize_creates_six_tables(self) -> None:
-        """初始化必须建齐 6 张业务表，缺表则后续角色无法按契约读写。
+        """初始化必须建齐 6 张业务表，缺表则后续动作无法按契约读写。
 
         边界：对空文件初始化；只认业务表名，不含 sqlite 内部表。
         """
@@ -221,6 +221,120 @@ class MemoryStoreTest(unittest.TestCase):
                 self.assertEqual(second.get_job(job["job_id"])["title"], "New")
             finally:
                 second.close()
+
+    def test_list_methods_return_write_order(self) -> None:
+        """无过滤 list_* 必须按写入顺序返回全部记录，供 Agent 自行判断。
+
+        边界：两岗、两要求、两切片、两题、两评分；不传过滤 ID。
+        """
+        first_job = self.store.save_job(
+            job_id="job-1",
+            source="web",
+            source_url="https://example.com/jobs/1",
+            title="One",
+        )
+        second_job = self.store.save_job(
+            job_id="job-2",
+            source="web",
+            source_url="https://example.com/jobs/2",
+            title="Two",
+        )
+        py = self.store.save_requirement(name="Python", requirement_id="req-py")
+        sql = self.store.save_requirement(name="SQL", requirement_id="req-sql")
+        self.store.save_knowledge_chunk(
+            chunk_id="chunk-py",
+            requirement_id=py["requirement_id"],
+            source_url="https://example.com/py",
+            title="list",
+            content="列表。",
+            evidence="list",
+        )
+        self.store.save_knowledge_chunk(
+            chunk_id="chunk-sql",
+            requirement_id=sql["requirement_id"],
+            source_url="https://example.com/sql",
+            title="join",
+            content="连接。",
+            evidence="join",
+        )
+        self.store.save_question(
+            question_id="q-py",
+            requirement_id=py["requirement_id"],
+            prompt="列表？",
+            standard_answer="有序。",
+        )
+        self.store.save_question(
+            question_id="q-sql",
+            requirement_id=sql["requirement_id"],
+            prompt="JOIN？",
+            standard_answer="匹配行。",
+        )
+        self.store.save_answer_score(
+            score_id="score-1",
+            question_id="q-py",
+            user_answer="不知道",
+            score=0,
+            max_score=10,
+        )
+        self.store.save_answer_score(
+            score_id="score-2",
+            question_id="q-sql",
+            user_answer="笛卡尔积",
+            score=1,
+            max_score=10,
+        )
+
+        self.assertEqual(
+            [row["job_id"] for row in self.store.list_jobs()],
+            [first_job["job_id"], second_job["job_id"]],
+        )
+        self.assertEqual(
+            [row["requirement_id"] for row in self.store.list_requirements()],
+            ["req-py", "req-sql"],
+        )
+        self.assertEqual(
+            [row["chunk_id"] for row in self.store.list_knowledge_chunks()],
+            ["chunk-py", "chunk-sql"],
+        )
+        self.assertEqual(
+            [row["question_id"] for row in self.store.list_questions()],
+            ["q-py", "q-sql"],
+        )
+        self.assertEqual(
+            [row["score_id"] for row in self.store.list_answer_scores()],
+            ["score-1", "score-2"],
+        )
+        self.assertEqual(
+            [row["chunk_id"] for row in self.store.list_knowledge_chunks("req-sql")],
+            ["chunk-sql"],
+        )
+
+    def test_constraint_error_in_chunk_batch_writes_nothing(self) -> None:
+        """事务中途外键失败必须整批回滚，否则半批会被后续 list 当成已有资料。
+
+        边界：第二片 requirement_id 在 requirements 表中不存在。
+        """
+        req = self.store.save_requirement(name="Git")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.save_knowledge_chunks(
+                [
+                    {
+                        "requirement_id": req["requirement_id"],
+                        "title": "commit",
+                        "content": "git commit 记录快照。",
+                        "source_url": "https://example.com/git-commit",
+                        "evidence": "git commit creates a snapshot.",
+                    },
+                    {
+                        "requirement_id": "req-missing",
+                        "title": "rebase",
+                        "content": "git rebase 重放提交。",
+                        "source_url": "https://example.com/git-rebase",
+                        "evidence": "git rebase reapplies commits.",
+                    },
+                ]
+            )
+        self.assertEqual(self.store.list_knowledge_chunks(req["requirement_id"]), [])
 
 
 if __name__ == "__main__":

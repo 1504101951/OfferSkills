@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS job_requirements (
     FOREIGN KEY (requirement_id) REFERENCES requirements(requirement_id)
 );
 
--- title/evidence 必填：出题角色把切片当完整资料，缺标题或出处原文无法追溯
+-- title/evidence 必填：出题时把切片当完整资料，缺标题或出处原文无法追溯
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
     chunk_id TEXT PRIMARY KEY,
     requirement_id TEXT NOT NULL,
@@ -181,6 +181,20 @@ class MemoryStore:
         ).fetchone()
         return _row_dict(row)
 
+    def list_jobs(self) -> list[dict[str, Any]]:
+        """列出全部岗位，供 Agent 召回后自行判断。
+
+        参数:
+            无。
+        返回:
+            list[dict]，顺序为写入顺序。
+        """
+        rows = self._conn.execute(
+            "SELECT job_id, source, source_url, title, city, salary, description "
+            "FROM jobs ORDER BY rowid"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def save_requirement(
         self,
         name: str,
@@ -233,6 +247,20 @@ class MemoryStore:
             (requirement_id,),
         ).fetchone()
         return _row_dict(row)
+
+    def list_requirements(self) -> list[dict[str, Any]]:
+        """列出全部原子岗位要求。
+
+        参数:
+            无。
+        返回:
+            list[dict]，顺序为写入顺序。
+        """
+        rows = self._conn.execute(
+            "SELECT requirement_id, name, normalized_name FROM requirements "
+            "ORDER BY rowid"
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def link_job_requirement(
         self, job_id: str, requirement_id: str, evidence: str
@@ -384,20 +412,26 @@ class MemoryStore:
         ).fetchone()
         return _row_dict(row)
 
-    def list_knowledge_chunks(self, requirement_id: str) -> list[dict[str, Any]]:
-        """按 requirement_id 列出知识切片。
+    def list_knowledge_chunks(
+        self, requirement_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """列出知识切片。个人库体量由 Agent 读完再判断，不在这里做检索。
 
         参数:
-            requirement_id: 岗位要求 ID。
+            requirement_id: 按岗位要求过滤；缺省则列出全部。
         返回:
             list[dict]，顺序为写入顺序。
         """
-        rows = self._conn.execute(
+        sql = (
             "SELECT chunk_id, requirement_id, source_url, title, content, evidence "
-            "FROM knowledge_chunks WHERE requirement_id = ? ORDER BY rowid",
-            (requirement_id,),
-        ).fetchall()
-        return [dict(row) for row in rows]
+            "FROM knowledge_chunks"
+        )
+        params: tuple[str, ...] = ()
+        if requirement_id is not None:
+            sql += " WHERE requirement_id = ?"
+            params = (requirement_id,)
+        sql += " ORDER BY rowid"
+        return [dict(row) for row in self._conn.execute(sql, params).fetchall()]
 
     def save_question(
         self,
@@ -454,20 +488,26 @@ class MemoryStore:
         ).fetchone()
         return _row_dict(row)
 
-    def list_questions(self, requirement_id: str) -> list[dict[str, Any]]:
-        """按 requirement_id 列出题目。
+    def list_questions(
+        self, requirement_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """列出题目。
 
         参数:
-            requirement_id: 岗位要求 ID。
+            requirement_id: 按岗位要求过滤；缺省则列出全部。
         返回:
             list[dict]，顺序为写入顺序。
         """
-        rows = self._conn.execute(
+        sql = (
             "SELECT question_id, requirement_id, prompt, standard_answer, explanation "
-            "FROM questions WHERE requirement_id = ? ORDER BY rowid",
-            (requirement_id,),
-        ).fetchall()
-        return [dict(row) for row in rows]
+            "FROM questions"
+        )
+        params: tuple[str, ...] = ()
+        if requirement_id is not None:
+            sql += " WHERE requirement_id = ?"
+            params = (requirement_id,)
+        sql += " ORDER BY rowid"
+        return [dict(row) for row in self._conn.execute(sql, params).fetchall()]
 
     def save_answer_score(
         self,
@@ -524,17 +564,23 @@ class MemoryStore:
         ).fetchone()
         return _row_dict(row)
 
-    def list_answer_scores(self, question_id: str) -> list[dict[str, Any]]:
-        """按 question_id 列出全部评分记录。
+    def list_answer_scores(
+        self, question_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """列出评分记录。
 
         参数:
-            question_id: 题目 ID。
+            question_id: 按题目过滤；缺省则列出全部。
         返回:
             list[dict]，顺序为写入顺序。
         """
-        rows = self._conn.execute(
-            "SELECT score_id, question_id, user_answer, score, max_score, loss_reason, weak_points "
-            "FROM answer_scores WHERE question_id = ? ORDER BY rowid",
-            (question_id,),
-        ).fetchall()
-        return [dict(row) for row in rows]
+        sql = (
+            "SELECT score_id, question_id, user_answer, score, max_score, "
+            "loss_reason, weak_points FROM answer_scores"
+        )
+        params: tuple[str, ...] = ()
+        if question_id is not None:
+            sql += " WHERE question_id = ?"
+            params = (question_id,)
+        sql += " ORDER BY rowid"
+        return [dict(row) for row in self._conn.execute(sql, params).fetchall()]
