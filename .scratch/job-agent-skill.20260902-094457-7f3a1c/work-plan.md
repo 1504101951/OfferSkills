@@ -5,6 +5,11 @@
 
 | 执行 Issue | 阻塞于 | 状态 | Executor 会话 | Reviewer 会话 | 返工次数 | 验收证据摘要 |
 | --- | --- | --- | --- | --- | --- | --- |
+| https://github.com/1504101951/OfferSkills/issues/2 | 无 | pending | 待派发 | 待创建 | 0 | |
+| https://github.com/1504101951/OfferSkills/issues/3 | #2 | pending | 待派发 | 待创建 | 0 | |
+| https://github.com/1504101951/OfferSkills/issues/4 | #2 | pending | 待派发 | 待创建 | 0 | |
+| https://github.com/1504101951/OfferSkills/issues/5 | #2、#4 | pending | 待派发 | 待创建 | 0 | |
+| https://github.com/1504101951/OfferSkills/issues/6 | #2、#5 | pending | 待派发 | 待创建 | 0 | |
 
 ## 验收边界
 
