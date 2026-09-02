@@ -1,6 +1,6 @@
 # 求职Agent Skill
 
-- Spec Issue: 待发布
+- Spec Issue: https://github.com/1504101951/OfferSkills/issues/1
 - Architecture: 可被通用 Agent 调用的 Skill；四个可独立调用的角色共享 SQLite 记忆。角色为岗位搜索、知识搜索、出题、打分。岗位要求全局去重，通过 job_requirements 表与公开岗位建立多对多关系。
 
 | 执行 Issue | 阻塞于 | 状态 | Executor 会话 | Reviewer 会话 | 返工次数 | 验收证据摘要 |
